@@ -5,7 +5,7 @@ admin.initializeApp();
 
 exports.productSync = functions
   .region("australia-southeast1")
-  .pubsub.schedule("every 2 hours")
+  .pubsub.schedule("every 8 hours")
   .onRun(async (context) => {
     axios.defaults.headers.common["x-v"] = "2";
     try {
