@@ -6,40 +6,58 @@ admin.initializeApp();
 
 const REGION = "australia-southeast1";
 const LEASE_TIME = 60 * 1000; // 60 seconds
-axios.defaults.headers.common["x-v"] = "2";
 
 const syncProductForBank = async (bankId) => {
   try {
+    // Retrieve bank record from firestore
     const bankRef2 = admin.firestore().collection("banks").doc(bankId);
     const bankSnapshot = await bankRef2.get();
 
     if (bankSnapshot.exists) {
+      let page = 1;
+      let totalPages = 1;
       const bank = bankSnapshot.data();
-      console.log(`Sync products from ${bank.name}`);
-      const response = await axios.get(`${bank.apiBaseUrl}/products`);
-      const products = response.data.data.products;
-      functions.logger.log(products);
 
-      if (products.length && products.length > 0) {
-        await Promise.all(products.map(async (p) => {
-          const productRef = admin.firestore().collection("products")
-            .doc(p.productId);
-          const snapshot = await productRef.get();
-          if (snapshot.exists) {
-            const storedProduct = snapshot.data();
-            if (p.lastUpdated !== storedProduct.lastUpdated) {
-              await productRef.set(p);
-              console.log(`Product '${p.name}' (${p.productId}) is updated`);
+      // Set API version number configured in the bank record
+      axios.defaults.headers.common["x-v"] = bank.xv;
+
+      // Iterate through every product pages
+      while (page <= totalPages) {
+        const response = await axios.get(`${bank.apiBaseUrl}/products?page=${page}`)
+          .catch((error) => {
+            functions.logger.error(`Unable to retrieve products for ${bankId} on page ${page}`, error);
+          });
+        const products = response.data.data.products;
+
+        totalPages = response.data.meta.totalPages;
+
+        functions.logger.log(`Processing products page ${page} out of ${totalPages}`);
+
+        if (products.length && products.length > 0) {
+          await Promise.all(products.map(async (p) => {
+            const productRef = admin.firestore().collection("products")
+              .doc(p.productId);
+            const snapshot = await productRef.get();
+
+            if (snapshot.exists) {
+              const storedProduct = snapshot.data();
+
+              if (p.lastUpdated !== storedProduct.lastUpdated) {
+                await productRef.set(p);
+                console.log(`Product '${p.name}' (${p.productId}) is updated`);
+              } else {
+                console.log(`Product '${p.name}' (${p.productId}) is skipped, no changes since last update`);
+              }
             } else {
-              console.log(`Product '${p.name}' (${p.productId}) is skipped, no changes since last update`);
+              await productRef.set(p);
+              console.log(`Product '${p.name}' (${p.productId}) is added`);
             }
-          } else {
-            await productRef.set(p);
-            console.log(`Product '${p.name}' (${p.productId}) is added`);
-          }
-        }));
-      } else {
-        console.error("Unable to parse products from api");
+          }));
+        } else {
+          console.error("Unable to parse products from api");
+        }
+
+        page = page + 1;
       }
     } else {
       console.error(`Bank ${bankId} does not exist`);
