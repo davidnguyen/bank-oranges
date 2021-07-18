@@ -5,7 +5,7 @@ module.exports = {
     node: true,
   },
   parserOptions: {
-    ecmaVersion: 8,
+    ecmaVersion: 9,
   },
   extends: [
     "eslint:recommended",
@@ -14,6 +14,6 @@ module.exports = {
   rules: {
     "quotes": ["error", "double"],
     "indent": ["error", 2, {MemberExpression: 1}],
-    "max-len": "off",
+    "max-len": "error",
   },
 };
