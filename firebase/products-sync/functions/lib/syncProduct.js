@@ -42,14 +42,27 @@ exports.syncProductForBank = async (db, bankId) => {
               const storedProduct = snapshot.data();
 
               if (p.lastUpdated !== storedProduct.lastUpdated) {
-                await productRef.set(p);
+                await productRef.set({
+                  ...p,
+                  meta: {
+                    ...p.meta,
+                    updated: new Date().toISOString(),
+                  },
+                });
                 console.log(`Product '${p.name}' (${p.productId}) is updated`);
               } else {
                 console.log(`Product '${p.name}' (${p.productId}) is skipped,
                   no changes since last update`);
               }
             } else {
-              await productRef.set(p);
+              await productRef.set({
+                ...p,
+                meta: {
+                  bank: bankId,
+                  created: new Date().toISOString(),
+                  updated: new Date().toISOString(),
+                },
+              });
               console.log(`Product '${p.name}' (${p.productId}) is added`);
             }
           }));

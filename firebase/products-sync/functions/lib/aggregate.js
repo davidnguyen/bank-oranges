@@ -22,6 +22,7 @@ exports.aggregate = async (
   const syncEventQuerySnapshot = await db.collection("syncEvents")
     .where("type", "==", eventType)
     .get();
+  console.log(`Aggregating ${syncEventQuerySnapshot.size} events`);
 
   for (const syncEventDocSnapshot of syncEventQuerySnapshot.docs) {
     const syncEvent = syncEventDocSnapshot.data();

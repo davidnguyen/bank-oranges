@@ -2,6 +2,7 @@ const functions = require("firebase-functions");
 const admin = require("firebase-admin");
 const {aggregate} = require("./lib/aggregate");
 const {syncProductForBank} = require("./lib/syncProduct");
+const axios = require("axios");
 
 admin.initializeApp();
 
@@ -65,7 +66,56 @@ exports.syncEventProductOnCreate = functions
     });
   });
 
-exports.aggregateProductBrands = functions
+exports.fetchProductDetails = functions
+  .region(REGION)
+  .firestore
+  .document("products/{productId}")
+  .onWrite(async (change, context) => {
+    try {
+      if (!change.after.exists) {
+        return;
+      }
+
+      const productId = context.params.productId;
+      const product = change.after.data();
+
+      if (product.meta.hasDetail) {
+        return;
+      }
+
+      const bankId = product.meta.bank;
+      const bankRef = db.collection("banks").doc(bankId);
+      const bankSnapshot = await bankRef.get();
+
+      if (!bankSnapshot.exists) {
+        console.error(`Bank ${bankId} does not exist`);
+        return;
+      }
+
+      const bank = bankSnapshot.data();
+      axios.defaults.headers.common["x-v"] = bank.xv;
+      axios.defaults.headers.common["Accept"] = "application/json";
+
+      const response = await axios.get(
+        `${bank.apiBaseUrl}/products/${productId}`);
+
+      const productDetails = response.data.data;
+
+      return change.after.ref.set({
+        ...productDetails,
+        meta: {
+          ...product.meta,
+          updated: new Date().toISOString(),
+          hasDetail: true,
+        },
+      });
+    } catch (error) {
+      functions.logger.error(
+        "There was an error while trying to fetch product details", error);
+    }
+  });
+
+exports.countProductBrands = functions
   .region(REGION)
   .pubsub.schedule("0 11 * * *")
   .onRun(async (context) => {
@@ -83,7 +133,7 @@ exports.aggregateProductBrands = functions
     );
   });
 
-exports.aggregateProductCategories = functions
+exports.countProductCategories = functions
   .region(REGION)
   .pubsub.schedule("2 11 * * *")
   .onRun(async (context) => {
