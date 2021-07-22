@@ -14,6 +14,6 @@ module.exports = {
   rules: {
     "quotes": ["error", "double"],
     "indent": ["error", 2, {MemberExpression: 1}],
-    "max-len": "error",
+    "max-len": "off",
   },
 };

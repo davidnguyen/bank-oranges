@@ -2,12 +2,12 @@ const functions = require("firebase-functions");
 const admin = require("firebase-admin");
 const {aggregate} = require("./lib/aggregate");
 const {syncProductForBank} = require("./lib/syncProduct");
+const {parseCategoryType} = require("./lib/utils");
 const axios = require("axios");
 
 admin.initializeApp();
-
-const REGION = "australia-southeast1";
 const db = admin.firestore();
+const REGION = "australia-southeast1";
 
 /*
   Schedule:
@@ -51,21 +51,6 @@ exports.productSyncBWE = functions
     await syncProductForBank(db, "bw");
   });
 
-exports.syncEventProductOnCreate = functions
-  .region(REGION)
-  .firestore
-  .document("products/{productId}")
-  .onCreate(async (snapshot, context) => {
-    const document = snapshot.data();
-    const syncEventRef = db.collection("syncEvents").doc(context.eventId);
-    await syncEventRef.set({
-      type: "products-on-create",
-      docId: context.params.productId,
-      document: document,
-      consumers: [],
-    });
-  });
-
 exports.fetchProductDetails = functions
   .region(REGION)
   .firestore
@@ -107,6 +92,7 @@ exports.fetchProductDetails = functions
           ...product.meta,
           updated: new Date().toISOString(),
           hasDetail: true,
+          type: parseCategoryType(productDetails.productCategory),
         },
       });
     } catch (error) {
@@ -121,15 +107,16 @@ exports.countProductBrands = functions
   .onRun(async (context) => {
     await aggregate(
       db,
-      "aggregateProductBrands",
-      "products-on-create",
+      "countProductBrands",
+      "products",
       "productBrands",
       (doc) => doc.brand,
       (previous, doc) => ({
+        ...previous,
         productCount: previous.productCount + 1,
         products: [...previous.products, doc.productId],
       }),
-      (doc) => ({productCount: 1, products: [doc.productId]}),
+      (doc) => ({name: doc.brand, productCount: 1, products: [doc.productId]}),
     );
   });
 
@@ -139,14 +126,20 @@ exports.countProductCategories = functions
   .onRun(async (context) => {
     await aggregate(
       db,
-      "aggregateProductCategories",
-      "products-on-create",
+      "countProductCategories",
+      "products",
       "productCategories",
       (doc) => doc.productCategory,
       (previous, doc) => ({
+        ...previous,
         productCount: previous.productCount + 1,
         products: [...previous.products, doc.productId],
       }),
-      (doc) => ({productCount: 1, products: [doc.productId]}),
+      (doc) => ({
+        name: doc.productCategory,
+        type: parseCategoryType(doc.productCategory),
+        productCount: 1,
+        products: [doc.productId],
+      }),
     );
   });

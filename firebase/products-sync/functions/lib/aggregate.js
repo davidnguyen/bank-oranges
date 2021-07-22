@@ -2,8 +2,9 @@
  * Runs aggregation for collection
  * @param {FirebaseFirestore.Firestore} db Firestore database
  * @param {string} consumerName Name of the aggregator
- * @param {string} eventType Type of event to aggregate
- * @param {string} aggregateCollection Collection to aggregate
+ * @param {string} sourceCollection The source collection for aggregation
+ * @param {string} targetCollection The target collection for
+ * aggregation results
  * @param {function} aggregateDocIdSelector Selector function to
  * return aggregate document id
  * @param {function} aggregateFunction Function to aggregate new value
@@ -13,40 +14,36 @@
 exports.aggregate = async (
   db,
   consumerName,
-  eventType,
-  aggregateCollection,
+  sourceCollection,
+  targetCollection,
   aggregateDocIdSelector,
   aggregateFunction,
   aggregateSeed,
 ) => {
-  const syncEventQuerySnapshot = await db.collection("syncEvents")
-    .where("type", "==", eventType)
+  const sourceQuerySnapshot = await db.collection(sourceCollection)
+    .where(`meta.aggregators.${consumerName}`, "==", 0)
     .get();
-  console.log(`Aggregating ${syncEventQuerySnapshot.size} events`);
+  console.log(`Aggregating ${sourceQuerySnapshot.size} source entries`);
 
-  for (const syncEventDocSnapshot of syncEventQuerySnapshot.docs) {
-    const syncEvent = syncEventDocSnapshot.data();
+  for (const sourceDocSnapshot of sourceQuerySnapshot.docs) {
+    const sourceDocument = sourceDocSnapshot.data();
+    const targetDocId = aggregateDocIdSelector(sourceDocument);
+    const targetDocRef = db.collection(targetCollection).doc(targetDocId);
+    const targetDocSnapshot = await targetDocRef.get();
 
-    // Only aggregate on event that has not been aggregated before
-    // by the same aggregator (consumer)
-    if (syncEvent.consumers.indexOf(consumerName) < 0) {
-      const aggregateDocId = aggregateDocIdSelector(syncEvent.document);
-      const aggregateDocRef = db.collection(aggregateCollection)
-        .doc(aggregateDocId);
-      const aggregateDocSnapshot = await aggregateDocRef.get();
-
-      if (aggregateDocSnapshot.exists) {
-        const aggregateDoc = aggregateDocSnapshot.data();
-        await aggregateDocRef.set(aggregateFunction(aggregateDoc,
-          syncEvent.document));
-      } else {
-        await aggregateDocRef.set(aggregateSeed(syncEvent.document));
-      }
-
-      await syncEventDocSnapshot.ref.set({
-        ...syncEvent,
-        consumers: [...syncEvent.consumers, consumerName],
-      });
+    if (targetDocSnapshot.exists) {
+      const targetDocument = targetDocSnapshot.data();
+      await targetDocRef.set(aggregateFunction(targetDocument,
+        sourceDocument));
+    } else {
+      await targetDocRef.set(aggregateSeed(sourceDocument));
     }
+    await sourceDocSnapshot.ref.set({
+      ...sourceDocument,
+      meta: {
+        ...sourceDocument.meta,
+        aggregators: {...sourceDocument.meta.aggregators, [consumerName]: 1},
+      },
+    });
   }
 };
