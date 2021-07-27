@@ -1,9 +1,9 @@
 const functions = require("firebase-functions");
 const admin = require("firebase-admin");
 const {aggregate} = require("./lib/aggregate");
-const {syncProductForBank} = require("./lib/syncProduct");
+const {syncProductForMultipleBanks} = require("./lib/syncProductForBank");
+const {syncProductDetails} = require("./lib/syncProductDetails");
 const {parseCategoryType} = require("./lib/utils");
-const axios = require("axios");
 
 admin.initializeApp();
 const db = admin.firestore();
@@ -16,130 +16,80 @@ const REGION = "australia-southeast1";
       3:00am Melbourne, Australia time
 */
 
-exports.productSyncCBA = functions
+/**
+ * Sync products for CBA, ANZ and NAB at 3:00am
+ */
+exports.syncProductFor_CBA_ANZ_NAB = functions
   .region(REGION)
   .pubsub.schedule("0 10 * * *")
   .onRun(async (context) => {
-    await syncProductForBank(db, "cba");
+    await syncProductForMultipleBanks(db, ["cba", "anz", "nab"]);
   });
 
-exports.productSyncANZ = functions
+/**
+ * Sync products for WESTPAC, BANKWEST at 3:02am
+ */
+exports.syncProductFor_WESTPAC_BANKWEST = functions
   .region(REGION)
   .pubsub.schedule("2 10 * * *")
   .onRun(async (context) => {
-    await syncProductForBank(db, "anz");
+    await syncProductForMultipleBanks(db, ["wbc", "bw"]);
   });
 
-exports.productSyncNAB = functions
+/**
+ * Sync product details at 3:30am
+ */
+exports.syncPrductDetails = functions
   .region(REGION)
-  .pubsub.schedule("4 10 * * *")
+  .pubsub.schedule("30 10 * * *")
   .onRun(async (context) => {
-    await syncProductForBank(db, "nab");
+    await syncProductDetails(db);
   });
 
-exports.productSyncWBC = functions
+/**
+ * Sync product details 2nd try at 3:35am
+ * This is due to the 1st try may encounter some 429 errors
+ * from the bank's api when fetching product details (too many requests)
+ */
+exports.syncPrductDetails = functions
   .region(REGION)
-  .pubsub.schedule("6 10 * * *")
+  .pubsub.schedule("35 10 * * *")
   .onRun(async (context) => {
-    await syncProductForBank(db, "wbc");
+    await syncProductDetails(db);
   });
 
-exports.productSyncBWE = functions
-  .region(REGION)
-  .pubsub.schedule("8 10 * * *")
-  .onRun(async (context) => {
-    await syncProductForBank(db, "bw");
-  });
-
-exports.fetchProductDetails = functions
-  .region(REGION)
-  .firestore
-  .document("products/{productId}")
-  .onWrite(async (change, context) => {
-    try {
-      if (!change.after.exists) {
-        return;
-      }
-
-      const productId = context.params.productId;
-      const product = change.after.data();
-
-      if (product.meta.hasDetail) {
-        return;
-      }
-
-      const bankId = product.meta.bank;
-      const bankRef = db.collection("banks").doc(bankId);
-      const bankSnapshot = await bankRef.get();
-
-      if (!bankSnapshot.exists) {
-        console.error(`Bank ${bankId} does not exist`);
-        return;
-      }
-
-      const bank = bankSnapshot.data();
-      axios.defaults.headers.common["x-v"] = bank.xv;
-      axios.defaults.headers.common["Accept"] = "application/json";
-
-      const response = await axios.get(
-        `${bank.apiBaseUrl}/products/${productId}`);
-
-      const productDetails = response.data.data;
-
-      return change.after.ref.set({
-        ...productDetails,
-        meta: {
-          ...product.meta,
-          updated: new Date().toISOString(),
-          hasDetail: true,
-          type: parseCategoryType(productDetails.productCategory),
-        },
-      });
-    } catch (error) {
-      functions.logger.error(
-        "There was an error while trying to fetch product details", error);
-    }
-  });
-
+/**
+ * Count product brands at 4:00am
+ */
 exports.countProductBrands = functions
   .region(REGION)
   .pubsub.schedule("0 11 * * *")
   .onRun(async (context) => {
     await aggregate(
       db,
-      "countProductBrands",
       "products",
+      (doc) => doc.productId,
       "productBrands",
       (doc) => doc.brand,
-      (previous, doc) => ({
-        ...previous,
-        productCount: previous.productCount + 1,
-        products: [...previous.products, doc.productId],
-      }),
-      (doc) => ({name: doc.brand, productCount: 1, products: [doc.productId]}),
+      (previous, doc) => ({productCount: previous.productCount + 1}),
+      (doc) => ({productCount: 1}),
     );
   });
 
+/**
+ * Count product categories at 4:02am
+ */
 exports.countProductCategories = functions
   .region(REGION)
   .pubsub.schedule("2 11 * * *")
   .onRun(async (context) => {
     await aggregate(
       db,
-      "countProductCategories",
       "products",
+      (doc) => doc.productId,
       "productCategories",
       (doc) => doc.productCategory,
-      (previous, doc) => ({
-        ...previous,
-        productCount: previous.productCount + 1,
-        products: [...previous.products, doc.productId],
-      }),
-      (doc) => ({
-        name: doc.productCategory,
-        type: parseCategoryType(doc.productCategory),
-        productCount: 1,
-        products: [doc.productId],
-      }),
+      (previous, doc) => ({productCount: previous.productCount + 1}),
+      (doc) => ({productCount: 1, type: parseCategoryType(doc.productCategory)}),
     );
   });
