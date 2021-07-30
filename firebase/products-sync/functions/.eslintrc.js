@@ -15,5 +15,6 @@ module.exports = {
     "quotes": ["error", "double"],
     "indent": ["error", 2, {MemberExpression: 1}],
     "max-len": "off",
+    "valid-jsdoc": ["off"],
   },
 };

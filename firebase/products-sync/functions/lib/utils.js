@@ -10,6 +10,15 @@ const FREQUENCIES = [
   {label: "P6M", value: 2},
 ];
 
+exports.group = (array, groupBy, valueReducer, seedValue, tagSelector) => {
+  return array.reduce((accumulator, current) => {
+    const groupName = current[groupBy];
+    return accumulator.groups.findIndex((g) => g.name === groupName) >= 0 ?
+      {groups: accumulator.groups.map((g) => g.name === groupName ? {...g, value: valueReducer(g.value, current)} : g)} :
+      {groups: [...accumulator.groups, {name: groupName, value: valueReducer(seedValue, current), tag: tagSelector ? tagSelector(current) : ""}]};
+  }, {groups: []}).groups;
+};
+
 /**
  * Determine whether a given category is of a "Lending" or "Deposit" type
  * @param {string} category
@@ -24,36 +33,47 @@ exports.parseCategoryType = (category) =>
  * @param {Array} fees Product fees
  * @return {Array} The estimated annual cost, and any warning found during calculation
  */
-exports.getTotalPeriodicFee = (fees) => {
-  let totalPeriodicFee = 0;
-  const warnings = [];
-  const countedFeeNames = [];
+exports.estimateTotalPeriodicCost = (fees) => {
+  const factoringFees = (fees || [])
+    .filter((f) => f.feeType === "PERIODIC")
+    .filter((f) => parseFloat(f.amount || "0") > 0)
+    .filter((f) => FREQUENCIES.findIndex((fr) => fr.label === f.additionalValue) >= 0);
 
-  (fees || []).forEach((fee) => {
-    const feeAmount = parseFloat(fee.amount || "0");
+  const factoringFeeGroups = this.group(
+    factoringFees,
+    "name",
+    (accumulator, current) => Math.min(accumulator, parseFloat(current.amount || "0")),
+    Number.MAX_VALUE,
+    (current) => current.additionalValue,
+  );
 
-    if (fee.feeType === "PERIODIC") {
-      const frequency = FREQUENCIES.filter((fq) => fq.label === fee.additionalValue);
+  const frequencyMultiplier = (frequency) => FREQUENCIES.find((fr) => fr.label === frequency).value;
 
-      if (frequency.length > 0) {
-        const hasNotCounted = countedFeeNames.indexOf(fee.name) < 0;
+  return [
+    factoringFeeGroups.reduce((accumulator, current) => accumulator + current.value * frequencyMultiplier(current.tag), 0),
+    factoringFeeGroups.map((group) => group.name),
+  ];
+};
 
-        if (hasNotCounted) {
-          if (fee.amount) {
-            totalPeriodicFee += feeAmount * frequency[0].value;
-            countedFeeNames.push(fee.name);
-          } else {
-            const rateType = fee.balanceRate ? "balance" : fee.transactionRate ? "trasaction" : fee.accruedRate ? "accrued" : "unspecified";
-            warnings.push(`${fee.name} is not a fixed amount and it is depending on ${rateType} rate`);
-          }
-        }
-      } else {
-        if (feeAmount > 0) {
-          warnings.push(`Unable to infer the periodic fee value of ${fee.name}`);
-        }
-      }
-    }
-  });
+/**
+ * Calculates the total upfront cost of the product based on the fee structure
+ * @param {Array} fees Product fees
+ * @return {Array} The estimated upfront cost, and any warning found during calculation
+ */
+exports.estimateTotalUpfrontCost = (fees) => {
+  const factoringFees = (fees || [])
+    .filter((f) => f.feeType === "UPFRONT")
+    .filter((f) => parseFloat(f.amount || "0") > 0);
 
-  return [totalPeriodicFee, warnings];
+  const factoringFeeGroups = this.group(
+    factoringFees,
+    "name",
+    (accumulator, current) => Math.min(accumulator, parseFloat(current.amount || "0")),
+    Number.MAX_VALUE,
+  );
+
+  return [
+    factoringFeeGroups.reduce((accumulator, current) => accumulator + current.value, 0),
+    factoringFeeGroups.map((group) => group.name),
+  ];
 };

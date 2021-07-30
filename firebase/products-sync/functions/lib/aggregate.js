@@ -1,12 +1,13 @@
 /**
- * Runs aggregation for collection
+ * Runs aggregation for a collection in which from a source document there is only one target aggregation document
+ * e.g. product.brand -> "CBA"
  * @param {FirebaseFirestore.Firestore} db Firestore database
  * @param {string} sourceCollection Source collection for aggregation
- * @param {function} sourceDocIdSelector Selector for source document id
+ * @param {(sourceDoc) => string} sourceDocIdSelector Selector for source document id
  * @param {string} targetCollection Target collection for aggregation results
- * @param {function} targetDocIdSelector Selector function to return aggregate document id
- * @param {function} aggregateFunction Function to aggregate new value from previous value
- * @param {function} aggregateSeed Function to seed the initial aggregate value
+ * @param {(sourceDoc) => string} targetDocIdSelector Selector function to return aggregate document id
+ * @param {(aggregateDoc, sourceDoc) => any} aggregateFunction Function to aggregate new value from previous aggregate and current document
+ * @param {(sourceDoc) => any} seedFunction Function to seed the initial aggregate value
  */
 exports.aggregate = async (
   db,
@@ -15,10 +16,10 @@ exports.aggregate = async (
   targetCollection,
   targetDocIdSelector,
   aggregateFunction,
-  aggregateSeed,
+  seedFunction,
 ) => {
   const sourceQuerySnapshot = await db.collection(sourceCollection).get();
-  console.log(`Aggregating ${sourceQuerySnapshot.size} source entries`);
+  console.log(`Evaluating ${sourceQuerySnapshot.size} source entries`);
 
   for (const sourceDocSnapshot of sourceQuerySnapshot.docs) {
     const sourceDocument = sourceDocSnapshot.data();
@@ -40,9 +41,8 @@ exports.aggregate = async (
         });
       }
     } else {
-      const seed = aggregateSeed(sourceDocument);
+      const seed = seedFunction(sourceDocument);
       await targetDocRef.set({
-        name: targetDocId,
         ...seed,
         sources: [sourceDocId],
       });
