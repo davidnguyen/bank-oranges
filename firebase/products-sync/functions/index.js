@@ -114,7 +114,7 @@ exports.count_product_eligibility = functions
       "productEligibility",
       (doc) => (doc.eligibility || []).map((x) => x.eligibilityType),
       (aggregate, element) => ({
-        productCount: aggregate.productCount + 1
+        productCount: aggregate.productCount + 1,
       }),
       (element) => ({
         productCount: 1,
@@ -138,7 +138,7 @@ exports.count_product_features = functions
       "productFeatures",
       (doc) => (doc.features || []).map((x) => x.featureType),
       (aggregate, element) => ({
-        productCount: aggregate.productCount + 1
+        productCount: aggregate.productCount + 1,
       }),
       (element) => ({
         productCount: 1,
@@ -162,7 +162,7 @@ exports.count_product_constraints = functions
       "productConstraints",
       (doc) => (doc.constraints || []).map((x) => x.constraintType),
       (aggregate, element) => ({
-        productCount: aggregate.productCount + 1
+        productCount: aggregate.productCount + 1,
       }),
       (element) => ({
         productCount: 1,
