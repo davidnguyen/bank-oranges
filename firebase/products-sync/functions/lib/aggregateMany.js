@@ -7,8 +7,8 @@
  * @param {(sourceDoc, targetDocId) => any} sourceDocElementSelector Selector for the element within the document to aggregate
  * @param {string} targetCollection Target collection for aggregation results
  * @param {(sourceDoc) => string[]} targetDocIdsSelector Selector function to return aggregate document ids
- * @param {(aggregateDoc, sourceElement) => any} aggregateFunction Function to aggregate new value from previous aggregate and current document
- * @param {(sourceElement) => any} seedFunction Function to seed the initial aggregate value
+ * @param {(aggregateDoc, sourceDocument, sourceElement) => any} aggregateFunction Function to aggregate new value from previous aggregate and current document
+ * @param {(sourceDocument, sourceElement) => any} seedFunction Function to seed the initial aggregate value
  */
 exports.aggregateMany = async (
   db,
@@ -38,7 +38,7 @@ exports.aggregateMany = async (
 
         // Only aggregate if sourceDocId not found in sources
         if (targetDocument.sources.indexOf(sourceDocId) < 0) {
-          const aggregate = aggregateFunction(targetDocument, sourceElement);
+          const aggregate = aggregateFunction(targetDocument, sourceDocument, sourceElement);
           await targetDocRef.set({
             ...targetDocument,
             ...aggregate,
@@ -46,7 +46,7 @@ exports.aggregateMany = async (
           });
         }
       } else {
-        const seed = seedFunction(sourceElement);
+        const seed = seedFunction(sourceDocument, sourceElement);
         await targetDocRef.set({
           ...seed,
           sources: [sourceDocId],

@@ -113,10 +113,10 @@ exports.count_product_eligibility = functions
       (doc, targetDocId) => (doc.eligibility || []).find((e) => e.eligibilityType === targetDocId),
       "productEligibility",
       (doc) => (doc.eligibility || []).map((x) => x.eligibilityType),
-      (aggregate, element) => ({
+      (aggregate, doc, element) => ({
         count: aggregate.count + 1,
       }),
-      (element) => ({
+      (doc, element) => ({
         count: 1,
         name: element.eligibilityType,
       }),
@@ -137,10 +137,10 @@ exports.count_product_features = functions
       (doc, targetDocId) => (doc.features || []).find((e) => e.featureType === targetDocId),
       "productFeatures",
       (doc) => (doc.features || []).map((x) => x.featureType),
-      (aggregate, element) => ({
+      (aggregate, doc, element) => ({
         count: aggregate.count + 1,
       }),
-      (element) => ({
+      (doc, element) => ({
         count: 1,
         name: element.featureType,
       }),
@@ -161,10 +161,10 @@ exports.count_product_constraints = functions
       (doc, targetDocId) => (doc.constraints || []).find((e) => e.constraintType === targetDocId),
       "productConstraints",
       (doc) => (doc.constraints || []).map((x) => x.constraintType),
-      (aggregate, element) => ({
+      (aggregate, doc, element) => ({
         count: aggregate.count + 1,
       }),
-      (element) => ({
+      (doc, element) => ({
         count: 1,
         name: element.constraintType,
       }),
@@ -185,14 +185,16 @@ exports.count_product_lending_rates = functions
       (doc, targetDocId) => (doc.lendingRates || []).find((e) => e.lendingRateType === targetDocId),
       "productLendingRates",
       (doc) => (doc.lendingRates || []).map((x) => x.lendingRateType),
-      (aggregate, element) => ({
+      (aggregate, doc, element) => ({
         count: aggregate.count + 1,
-        tiers: [...new Set([...aggregate.tiers, (element.tiers ||[]).map((t) => t.name)])],
+        tiers: [...new Set([...aggregate.tiers, ...(element.tiers ||[]).map((t) => t.unitOfMeasure)])],
+        categories: [...new Set([...aggregate.categories, doc.productCategory])],
       }),
-      (element) => ({
+      (doc, element) => ({
         name: element.lendingRateType,
         count: 1,
-        tiers: [...new Set([(element.tiers ||[]).map((t) => t.name)])],
+        tiers: [...new Set((element.tiers ||[]).map((t) => t.unitOfMeasure))],
+        categories: [doc.productCategory],
       }),
     );
   });
