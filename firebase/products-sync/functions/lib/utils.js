@@ -29,11 +29,11 @@ exports.parseCategoryType = (category) =>
     "Deposit" : "Lending";
 
 /**
- * Calculates the estimated annual cost of the product based on the fee structure
+ * Calculates the indicative annual fee of the product based on the fee structure
  * @param {Array} fees Product fees
- * @return {Array} The estimated annual cost, and any warning found during calculation
+ * @return {Array} The indicative annual fee, and any warning found during calculation
  */
-exports.estimateTotalPeriodicCost = (fees) => {
+exports.calculateIndicativePeriodicFee = (fees) => {
   const factoringFees = (fees || [])
     .filter((f) => f.feeType === "PERIODIC")
     .filter((f) => parseFloat(f.amount || "0") > 0)
@@ -56,13 +56,36 @@ exports.estimateTotalPeriodicCost = (fees) => {
 };
 
 /**
- * Calculates the total upfront cost of the product based on the fee structure
+ * Calculates the inticative upfront fee of the product based on the fee structure
  * @param {Array} fees Product fees
- * @return {Array} The estimated upfront cost, and any warning found during calculation
+ * @return {Array} The indicative upfront fee, and any warning found during calculation
  */
-exports.estimateTotalUpfrontCost = (fees) => {
+exports.calculateIndicativeUpfrontFee = (fees) => {
   const factoringFees = (fees || [])
     .filter((f) => f.feeType === "UPFRONT")
+    .filter((f) => parseFloat(f.amount || "0") > 0);
+
+  const factoringFeeGroups = this.group(
+    factoringFees,
+    "name",
+    (accumulator, current) => Math.min(accumulator, parseFloat(current.amount || "0")),
+    Number.MAX_VALUE,
+  );
+
+  return [
+    factoringFeeGroups.reduce((accumulator, current) => accumulator + current.value, 0),
+    factoringFeeGroups.map((group) => group.name),
+  ];
+};
+
+/**
+ * Calculates the inticative exit fee of the product based on the fee structure
+ * @param {Array} fees Product fees
+ * @return {Array} The indicative exit fee, and any warning found during calculation
+ */
+exports.calculateIndicativeExitFee = (fees) => {
+  const factoringFees = (fees || [])
+    .filter((f) => f.feeType === "EXIT")
     .filter((f) => parseFloat(f.amount || "0") > 0);
 
   const factoringFeeGroups = this.group(

@@ -72,8 +72,8 @@ exports.count_product_brands = functions
       (doc) => doc.productId,
       "productBrands",
       (doc) => doc.brand,
-      (aggregate, doc) => ({productCount: aggregate.productCount + 1}),
-      (doc) => ({productCount: 1, name: doc.brand}),
+      (aggregate, doc) => ({count: aggregate.count + 1}),
+      (doc) => ({count: 1, name: doc.brand}),
     );
   });
 
@@ -90,9 +90,9 @@ exports.count_product_categories = functions
       (doc) => doc.productId,
       "productCategories",
       (doc) => doc.productCategory,
-      (aggregate, doc) => ({productCount: aggregate.productCount + 1}),
+      (aggregate, doc) => ({count: aggregate.count + 1}),
       (doc) => ({
-        productCount: 1,
+        count: 1,
         name: doc.productCategory,
         type: parseCategoryType(doc.productCategory),
       }),
@@ -114,10 +114,10 @@ exports.count_product_eligibility = functions
       "productEligibility",
       (doc) => (doc.eligibility || []).map((x) => x.eligibilityType),
       (aggregate, element) => ({
-        productCount: aggregate.productCount + 1,
+        count: aggregate.count + 1,
       }),
       (element) => ({
-        productCount: 1,
+        count: 1,
         name: element.eligibilityType,
       }),
     );
@@ -138,10 +138,10 @@ exports.count_product_features = functions
       "productFeatures",
       (doc) => (doc.features || []).map((x) => x.featureType),
       (aggregate, element) => ({
-        productCount: aggregate.productCount + 1,
+        count: aggregate.count + 1,
       }),
       (element) => ({
-        productCount: 1,
+        count: 1,
         name: element.featureType,
       }),
     );
@@ -162,11 +162,37 @@ exports.count_product_constraints = functions
       "productConstraints",
       (doc) => (doc.constraints || []).map((x) => x.constraintType),
       (aggregate, element) => ({
-        productCount: aggregate.productCount + 1,
+        count: aggregate.count + 1,
       }),
       (element) => ({
-        productCount: 1,
+        count: 1,
         name: element.constraintType,
+      }),
+    );
+  });
+
+/**
+ * Count product lending rates at 4:10am
+ */
+exports.count_product_lending_rates = functions
+  .region(REGION)
+  .pubsub.schedule("10 11 * * *")
+  .onRun(async (context) => {
+    await aggregateMany(
+      db,
+      "products",
+      (doc) => doc.productId,
+      (doc, targetDocId) => (doc.lendingRates || []).find((e) => e.lendingRateType === targetDocId),
+      "productLendingRates",
+      (doc) => (doc.lendingRates || []).map((x) => x.lendingRateType),
+      (aggregate, element) => ({
+        count: aggregate.count + 1,
+        tiers: [...new Set([...aggregate.tiers, (element.tiers ||[]).map((t) => t.name)])],
+      }),
+      (element) => ({
+        name: element.lendingRateType,
+        count: 1,
+        tiers: [...new Set([(element.tiers ||[]).map((t) => t.name)])],
       }),
     );
   });

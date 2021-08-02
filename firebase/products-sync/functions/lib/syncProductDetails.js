@@ -2,8 +2,9 @@ const axios = require("axios");
 const functions = require("firebase-functions");
 const {
   parseCategoryType,
-  estimateTotalUpfrontCost,
-  estimateTotalPeriodicCost,
+  calculateIndicativePeriodicFee,
+  calculateIndicativeUpfrontFee,
+  calculateIndicativeExitFee,
 } = require("./utils");
 
 /**
@@ -73,8 +74,9 @@ const syncProduct = async (productSnapshot, db) => {
         `${bank.apiBaseUrl}/products/${product.productId}`);
 
       const productDetails = response.data.data;
-      const [totalPeriodicCost, totalPeriodicCostFactors] = estimateTotalPeriodicCost(productDetails.fees);
-      const [totalUpfrontCost, totalUpfrontCostFactors] = estimateTotalUpfrontCost(productDetails.fees);
+      const [indicativePeriodicFee, indicativePeriodicFeeFactors] = calculateIndicativePeriodicFee(productDetails.fees);
+      const [indicativeUpfrontFee, indicativeUpfrontFeeFactors] = calculateIndicativeUpfrontFee(productDetails.fees);
+      const [indicativeExitFee, indicativeExitFeeFactors] = calculateIndicativeExitFee(productDetails.fees);
 
       await productSnapshot.ref.set({
         ...productDetails,
@@ -83,10 +85,14 @@ const syncProduct = async (productSnapshot, db) => {
           updated: new Date().toISOString(),
           hasDetail: true,
           type: parseCategoryType(productDetails.productCategory),
-          totalPeriodicCost,
-          totalPeriodicCostFactors,
-          totalUpfrontCost,
-          totalUpfrontCostFactors,
+          fees: {
+            indicativePeriodicFee,
+            indicativePeriodicFeeFactors,
+            indicativeUpfrontFee,
+            indicativeUpfrontFeeFactors,
+            indicativeExitFee,
+            indicativeExitFeeFactors,
+          },
         },
       });
       syncSuccess = productDetails.productId;
