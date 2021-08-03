@@ -84,17 +84,38 @@ exports.count_product_categories = functions
   .region(REGION)
   .pubsub.schedule("2 11 * * *")
   .onRun(async (context) => {
+    const featureTypesMapper = (doc) => (doc.features || []).map((x) => x.featureType);
+    const feeTypesMapper = (doc) => (doc.fees || []).map((x) => x.feeType);
+    const eligibilityTypesMapper = (doc) => (doc.eligibility || []).map((x) => x.eligibilityType);
+    const constraintTypesMapper = (doc) => (doc.constraints || []).map((x) => x.constraintType);
+    const lendingRateTypesMapper = (doc) => (doc.lendingRates || []).map((x) => x.lendingRateType);
+    const depositRateTypesMapper = (doc) => (doc.depositRates || []).map((x) => x.depositRateType);
+
     await aggregate(
       db,
       "products",
       (doc) => doc.productId,
       "productCategories",
       (doc) => doc.productCategory,
-      (aggregate, doc) => ({count: aggregate.count + 1}),
+      (aggregate, doc) => ({
+        count: aggregate.count + 1,
+        featureTypes: [...new Set([...aggregate.featureTypes, ...featureTypesMapper(doc)])],
+        feeTypes: [...new Set([...aggregate.feeTypes, ...feeTypesMapper(doc)])],
+        eligibilityTypes: [...new Set([...aggregate.eligibilityTypes, ...eligibilityTypesMapper(doc)])],
+        constraintTypes: [...new Set([...aggregate.constraintTypes, ...constraintTypesMapper(doc)])],
+        lendingRateTypes: [...new Set([...aggregate.lendingRateTypes, ...lendingRateTypesMapper(doc)])],
+        depositRateTypes: [...new Set([...aggregate.depositRateTypes, ...depositRateTypesMapper(doc)])],
+      }),
       (doc) => ({
-        count: 1,
         name: doc.productCategory,
         type: parseCategoryType(doc.productCategory),
+        count: 1,
+        featureTypes: [...new Set(featureTypesMapper(doc))],
+        feeTypes: [...new Set(feeTypesMapper(doc))],
+        eligibilityTypes: [...new Set(eligibilityTypesMapper(doc))],
+        constraintTypes: [...new Set(constraintTypesMapper(doc))],
+        lendingRateTypes: [...new Set(lendingRateTypesMapper(doc))],
+        depositRateTypes: [...new Set(depositRateTypesMapper(doc))],
       }),
     );
   });
@@ -188,13 +209,37 @@ exports.count_product_lending_rates = functions
       (aggregate, doc, element) => ({
         count: aggregate.count + 1,
         tiers: [...new Set([...aggregate.tiers, ...(element.tiers ||[]).map((t) => t.unitOfMeasure)])],
-        categories: [...new Set([...aggregate.categories, doc.productCategory])],
       }),
       (doc, element) => ({
         name: element.lendingRateType,
         count: 1,
         tiers: [...new Set((element.tiers ||[]).map((t) => t.unitOfMeasure))],
-        categories: [doc.productCategory],
+      }),
+    );
+  });
+
+/**
+ * Count product deposit rates at 4:12am
+ */
+exports.count_product_deposit_rates = functions
+  .region(REGION)
+  .pubsub.schedule("12 11 * * *")
+  .onRun(async (context) => {
+    await aggregateMany(
+      db,
+      "products",
+      (doc) => doc.productId,
+      (doc, targetDocId) => (doc.depositRates || []).find((e) => e.depositRateType === targetDocId),
+      "productDepositRates",
+      (doc) => (doc.depositRates || []).map((x) => x.depositRateType),
+      (aggregate, doc, element) => ({
+        count: aggregate.count + 1,
+        tiers: [...new Set([...aggregate.tiers, ...(element.tiers ||[]).map((t) => t.unitOfMeasure)])],
+      }),
+      (doc, element) => ({
+        name: element.depositRateType,
+        count: 1,
+        tiers: [...new Set((element.tiers ||[]).map((t) => t.unitOfMeasure))],
       }),
     );
   });

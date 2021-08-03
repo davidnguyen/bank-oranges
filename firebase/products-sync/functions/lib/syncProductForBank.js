@@ -90,7 +90,7 @@ exports.syncProductForBank = async (db, bankId, pageSize = 100) => {
     } catch (error) {
       functions.logger.error(`There was an error while trying to sync products for ${bankId}`,
         error);
-      syncError = error.response ? error.response.data : error;
+      syncError = error.response ? error.response.data : error.toString();
     }
 
     await bankRef.set({
