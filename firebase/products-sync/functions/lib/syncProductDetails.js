@@ -69,14 +69,15 @@ const syncProduct = async (productSnapshot, db) => {
 
       const response = await axios.get(
         `${bank.apiBaseUrl}/products/${product.productId}`, {...axiosConfig});
+      const productDetails = response.data.data;
 
       await productSnapshot.ref.set({
         ...productDetails,
         meta: {
           ...product.meta,
           updated: new Date().toISOString(),
-          hasDetail: true,
           type: parseCategoryType(productDetails.productCategory),
+          hasDetail: true,
         },
       });
       syncSuccess = productDetails.productId;

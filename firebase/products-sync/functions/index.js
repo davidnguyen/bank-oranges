@@ -72,8 +72,15 @@ exports.count_product_brands = functions
       (doc) => doc.productId,
       "productBrands",
       (doc) => doc.brand,
-      (aggregate, doc) => ({count: aggregate.count + 1}),
-      (doc) => ({count: 1, name: doc.brand}),
+      (aggregate, doc) => ({
+        count: aggregate.count + 1,
+        categories: [...new Set([...aggregate.categories, doc.productCategory])],
+      }),
+      (doc) => ({
+        name: doc.brandName ? doc.brandName : doc.brand,
+        count: 1,
+        categories: [doc.productCategory],
+      }),
     );
   });
 

@@ -1,14 +1,14 @@
 const DEPOSIT_CATEGORIES = ["REGULATED_TRUST_ACCOUNTS", "TERM_DEPOSITS",
   "TRANS_AND_SAVINGS_ACCOUNTS", "TRAVEL_CARDS"];
-const FREQUENCIES = [
-  {label: "P1Y", value: 1},
-  {label: "P12M", value: 1},
-  {label: "P1M", value: 12},
-  {label: "P3M", value: 4},
-  {label: "P4M", value: 3},
-  {label: "P2M", value: 6},
-  {label: "P6M", value: 2},
-];
+// const FREQUENCIES = [
+//   {label: "P1Y", value: 1},
+//   {label: "P12M", value: 1},
+//   {label: "P1M", value: 12},
+//   {label: "P3M", value: 4},
+//   {label: "P4M", value: 3},
+//   {label: "P2M", value: 6},
+//   {label: "P6M", value: 2},
+// ];
 
 exports.group = (array, groupBy, valueReducer, seedValue, tagSelector) => {
   return array.reduce((accumulator, current) => {

@@ -21,31 +21,47 @@ exports.aggregate = async (
   const sourceQuerySnapshot = await db.collection(sourceCollection).get();
   console.log(`Evaluating ${sourceQuerySnapshot.size} source entries`);
 
+  let aggregatedDocs = 0;
   for (const sourceDocSnapshot of sourceQuerySnapshot.docs) {
     const sourceDocument = sourceDocSnapshot.data();
-    const sourceDocId = sourceDocIdSelector(sourceDocument);
-    const targetDocId = targetDocIdSelector(sourceDocument);
-    const targetDocRef = db.collection(targetCollection).doc(targetDocId);
-    const targetDocSnapshot = await targetDocRef.get();
 
-    if (targetDocSnapshot.exists) {
-      const targetDocument = targetDocSnapshot.data();
+    if (!sourceDocument.meta.aggregated[targetCollection]) {
+      const sourceDocId = sourceDocIdSelector(sourceDocument);
+      const targetDocId = targetDocIdSelector(sourceDocument);
+      const targetDocRef = db.collection(targetCollection).doc(targetDocId);
+      const targetDocSnapshot = await targetDocRef.get();
 
-      // Only aggregate if sourceDocId not found in sources
-      if (targetDocument.sources.indexOf(sourceDocId) < 0) {
-        const aggregate = aggregateFunction(targetDocument, sourceDocument);
+      if (targetDocSnapshot.exists) {
+        const targetDocument = targetDocSnapshot.data();
+
+        // Only aggregate if sourceDocId not found in sources
+        if (targetDocument.sources.indexOf(sourceDocId) < 0) {
+          const aggregate = aggregateFunction(targetDocument, sourceDocument);
+          await targetDocRef.set({
+            ...targetDocument,
+            ...aggregate,
+            sources: [...targetDocument.sources, sourceDocId],
+          });
+        }
+      } else {
+        const seed = seedFunction(sourceDocument);
         await targetDocRef.set({
-          ...targetDocument,
-          ...aggregate,
-          sources: [...targetDocument.sources, sourceDocId],
+          ...seed,
+          sources: [sourceDocId],
         });
       }
-    } else {
-      const seed = seedFunction(sourceDocument);
-      await targetDocRef.set({
-        ...seed,
-        sources: [sourceDocId],
+
+      await sourceDocSnapshot.ref.set({
+        ...sourceDocument,
+        meta: {
+          ...sourceDocument.meta,
+          aggregated: {...sourceDocument.meta.aggregated, [targetCollection]: true},
+        },
       });
+
+      aggregatedDocs += 1;
     }
   }
+
+  console.log(`Aggregated ${aggregatedDocs} entries`);
 };

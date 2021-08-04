@@ -66,6 +66,8 @@ exports.syncProductForBank = async (db, bankId, pageSize = 100) => {
                   ...storedProduct,
                   meta: {
                     ...storedProduct.meta,
+                    // Reset aggregated states when product update happens
+                    aggregated: {},
                     hasDetail: false,
                   },
                 });
@@ -79,6 +81,7 @@ exports.syncProductForBank = async (db, bankId, pageSize = 100) => {
                   created: new Date().toISOString(),
                   updated: new Date().toISOString(),
                   hasDetail: false,
+                  aggregated: {},
                 },
               });
               totalProductAdded++;
