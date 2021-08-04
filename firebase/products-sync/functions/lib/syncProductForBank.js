@@ -1,4 +1,5 @@
 const axios = require("axios");
+const https = require("https");
 const functions = require("firebase-functions");
 
 /**
@@ -21,7 +22,7 @@ exports.syncProductForMultipleBanks = async (db, bankIds, pageSize = 100) => {
  */
 exports.syncProductForBank = async (db, bankId, pageSize = 100) => {
   // Retrieve bank record from firestore
-  const bankRef = db.collection("banks").doc(bankId);
+  const bankRef = db.collection("_banks").doc(bankId);
   const bankSnapshot = await bankRef.get();
 
   if (bankSnapshot.exists) {
@@ -34,14 +35,15 @@ exports.syncProductForBank = async (db, bankId, pageSize = 100) => {
     const bank = bankSnapshot.data();
 
     // Set API version number configured in the bank record
-    axios.defaults.headers.common["x-v"] = bank.xv;
+    axios.defaults.headers.common["x-v"] = bank.apiVersion;
     axios.defaults.headers.common["Accept"] = "application/json";
+    const axiosConfig = bank.apiCertificateVerified ? {} : {httpsAgent: new https.Agent({rejectUnauthorized: false})};
 
     try {
       // Iterate through every product pages
       while (page <= totalPages) {
         const response = await axios.get(
-          `${bank.apiBaseUrl}/products?page=${page}&page-size=${pageSize}`);
+          `${bank.apiBaseUrl}/products?page=${page}&page-size=${pageSize}`, {...axiosConfig});
         const products = response.data.data.products;
 
         totalPages = response.data.meta.totalPages;
@@ -88,9 +90,9 @@ exports.syncProductForBank = async (db, bankId, pageSize = 100) => {
         page = page + 1;
       }
     } catch (error) {
-      functions.logger.error(`There was an error while trying to sync products for ${bankId}`,
-        error);
       syncError = error.response ? error.response.data : error.toString();
+      functions.logger.error(`There was an error while trying to sync products for ${bankId}`,
+        error, syncError);
     }
 
     await bankRef.set({

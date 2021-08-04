@@ -1,11 +1,7 @@
 const axios = require("axios");
+const https = require("https");
 const functions = require("firebase-functions");
-const {
-  parseCategoryType,
-  calculateIndicativePeriodicFee,
-  calculateIndicativeUpfrontFee,
-  calculateIndicativeExitFee,
-} = require("./utils");
+const {parseCategoryType} = require("./utils");
 
 /**
  * Sync propduct details
@@ -60,23 +56,19 @@ const syncProduct = async (productSnapshot, db) => {
 
   try {
     const bankId = product.meta.bank;
-    const bankRef = db.collection("banks").doc(bankId);
+    const bankRef = db.collection("_banks").doc(bankId);
     const bankSnapshot = await bankRef.get();
 
     if (!bankSnapshot.exists) {
       console.error(`Bank ${bankId} does not exist`);
     } else {
       const bank = bankSnapshot.data();
-      axios.defaults.headers.common["x-v"] = bank.xv;
+      axios.defaults.headers.common["x-v"] = bank.apiVersion;
       axios.defaults.headers.common["Accept"] = "application/json";
+      const axiosConfig = bank.apiCertificateVerified ? {} : {httpsAgent: new https.Agent({rejectUnauthorized: false})};
 
       const response = await axios.get(
-        `${bank.apiBaseUrl}/products/${product.productId}`);
-
-      const productDetails = response.data.data;
-      const [indicativePeriodicFee, indicativePeriodicFeeFactors] = calculateIndicativePeriodicFee(productDetails.fees);
-      const [indicativeUpfrontFee, indicativeUpfrontFeeFactors] = calculateIndicativeUpfrontFee(productDetails.fees);
-      const [indicativeExitFee, indicativeExitFeeFactors] = calculateIndicativeExitFee(productDetails.fees);
+        `${bank.apiBaseUrl}/products/${product.productId}`, {...axiosConfig});
 
       await productSnapshot.ref.set({
         ...productDetails,
@@ -85,14 +77,6 @@ const syncProduct = async (productSnapshot, db) => {
           updated: new Date().toISOString(),
           hasDetail: true,
           type: parseCategoryType(productDetails.productCategory),
-          fees: {
-            indicativePeriodicFee,
-            indicativePeriodicFeeFactors,
-            indicativeUpfrontFee,
-            indicativeUpfrontFeeFactors,
-            indicativeExitFee,
-            indicativeExitFeeFactors,
-          },
         },
       });
       syncSuccess = productDetails.productId;

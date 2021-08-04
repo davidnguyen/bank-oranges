@@ -34,7 +34,7 @@ exports.sync_products_for_banks_2nd_batch = functions
   .region(REGION)
   .pubsub.schedule("2 10 * * *")
   .onRun(async (context) => {
-    await syncProductForMultipleBanks(db, ["wbc", "bw"]);
+    await syncProductForMultipleBanks(db, ["westpac", "bankwest", "virgin"]);
   });
 
 /**
