@@ -4,7 +4,7 @@ const {aggregate} = require("./lib/aggregate");
 const {aggregateMany} = require("./lib/aggregateMany");
 const {syncProductForMultipleBanks} = require("./lib/syncProductForBank");
 const {syncProductDetails} = require("./lib/syncProductDetails");
-const {parseCategoryType} = require("./lib/utils");
+const {parseCategoryType, fetchDictionary} = require("./lib/utils");
 
 admin.initializeApp();
 const db = admin.firestore();
@@ -97,6 +97,8 @@ exports.count_product_categories = functions
     const constraintTypesMapper = (doc) => (doc.constraints || []).map((x) => x.constraintType);
     const lendingRateTypesMapper = (doc) => (doc.lendingRates || []).map((x) => x.lendingRateType);
     const depositRateTypesMapper = (doc) => (doc.depositRates || []).map((x) => x.depositRateType);
+    const dictionary = await fetchDictionary(db);
+    const nameMapper = (categoryId) => dictionary.find((entry) => entry.key === categoryId) || {en: categoryId};
 
     await aggregate(
       db,
@@ -114,7 +116,7 @@ exports.count_product_categories = functions
         depositRateTypes: [...new Set([...aggregate.depositRateTypes, ...depositRateTypesMapper(doc)])],
       }),
       (doc) => ({
-        name: doc.productCategory,
+        name: nameMapper(doc.productCategory).en,
         type: parseCategoryType(doc.productCategory),
         count: 1,
         featureTypes: [...new Set(featureTypesMapper(doc))],
