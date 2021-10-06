@@ -100,6 +100,26 @@ exports.count_product_categories = functions
     const dictionary = await fetchDictionary(db);
     const nameMapper = (categoryId) => dictionary.find((entry) => entry.key === categoryId) || {en: categoryId};
 
+    // const feeTypesAggregator = (doc, feeTypes) => {
+    //   const docFeeTypes = feeTypesMapper(doc);
+    //   const docFeeTypeCounts = docFeeTypes.map((x) => ({type: x, count: 1}));
+    //   return feeTypes.concat(docFeeTypeCounts).reduce(
+    //     (prev, current) => [
+    //       ...prev.map((p) => p.type === current.type ? {type: p.type, count: p.count + 1} : p),
+    //       ...prev.findIndex((p) => p.type === current.type) >= 0 ? [] : [current]], [],
+    //   );
+    // };
+
+    const distributionAggregator = (doc, distribution, typeMapper) => {
+      const types = typeMapper(doc);
+      const typeCounts = types.map((x) => ({type: x, count: 1}));
+      return distribution.concat(typeCounts).reduce(
+        (prev, current) => [
+          ...prev.map((p) => p.type === current.type ? {type: p.type, count: p.count + 1} : p),
+          ...prev.findIndex((p) => p.type === current.type) >= 0 ? [] : [current]], [],
+      );
+    };
+
     await aggregate(
       db,
       "products",
@@ -114,6 +134,10 @@ exports.count_product_categories = functions
         constraintTypes: [...new Set([...aggregate.constraintTypes, ...constraintTypesMapper(doc)])],
         lendingRateTypes: [...new Set([...aggregate.lendingRateTypes, ...lendingRateTypesMapper(doc)])],
         depositRateTypes: [...new Set([...aggregate.depositRateTypes, ...depositRateTypesMapper(doc)])],
+        featureTypeDistribution: distributionAggregator(doc, aggregate.featureTypeDistribution, featureTypesMapper),
+        feeTypeDistribution: distributionAggregator(doc, aggregate.feeTypeDistribution, feeTypesMapper),
+        lendingRateTypeDistribution: distributionAggregator(doc, aggregate.lendingRateTypeDistribution, lendingRateTypesMapper),
+        depositRateTypeDistribution: distributionAggregator(doc, aggregate.depositRateTypeDistribution, depositRateTypesMapper),
       }),
       (doc) => ({
         name: nameMapper(doc.productCategory).en,
@@ -125,6 +149,10 @@ exports.count_product_categories = functions
         constraintTypes: [...new Set(constraintTypesMapper(doc))],
         lendingRateTypes: [...new Set(lendingRateTypesMapper(doc))],
         depositRateTypes: [...new Set(depositRateTypesMapper(doc))],
+        featureTypeDistribution: distributionAggregator(doc, [], featureTypesMapper),
+        feeTypeDistribution: distributionAggregator(doc, [], feeTypesMapper),
+        lendingRateTypeDistribution: distributionAggregator(doc, [], lendingRateTypesMapper),
+        depositRateTypeDistribution: distributionAggregator(doc, [], depositRateTypesMapper),
       }),
     );
   });
