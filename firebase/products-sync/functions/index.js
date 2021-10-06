@@ -100,16 +100,6 @@ exports.count_product_categories = functions
     const dictionary = await fetchDictionary(db);
     const nameMapper = (categoryId) => dictionary.find((entry) => entry.key === categoryId) || {en: categoryId};
 
-    // const feeTypesAggregator = (doc, feeTypes) => {
-    //   const docFeeTypes = feeTypesMapper(doc);
-    //   const docFeeTypeCounts = docFeeTypes.map((x) => ({type: x, count: 1}));
-    //   return feeTypes.concat(docFeeTypeCounts).reduce(
-    //     (prev, current) => [
-    //       ...prev.map((p) => p.type === current.type ? {type: p.type, count: p.count + 1} : p),
-    //       ...prev.findIndex((p) => p.type === current.type) >= 0 ? [] : [current]], [],
-    //   );
-    // };
-
     const distributionAggregator = (doc, distribution, typeMapper) => {
       const types = typeMapper(doc);
       const typeCounts = types.map((x) => ({type: x, count: 1}));
@@ -136,6 +126,8 @@ exports.count_product_categories = functions
         depositRateTypes: [...new Set([...aggregate.depositRateTypes, ...depositRateTypesMapper(doc)])],
         featureTypeDistribution: distributionAggregator(doc, aggregate.featureTypeDistribution, featureTypesMapper),
         feeTypeDistribution: distributionAggregator(doc, aggregate.feeTypeDistribution, feeTypesMapper),
+        eligibilityTypeDistribution: distributionAggregator(doc, aggregate.eligibilityTypeDistribution, eligibilityTypesMapper),
+        constraintTypeDistribution: distributionAggregator(doc, aggregate.constraintTypeDistribution, constraintTypesMapper),
         lendingRateTypeDistribution: distributionAggregator(doc, aggregate.lendingRateTypeDistribution, lendingRateTypesMapper),
         depositRateTypeDistribution: distributionAggregator(doc, aggregate.depositRateTypeDistribution, depositRateTypesMapper),
       }),
@@ -151,6 +143,8 @@ exports.count_product_categories = functions
         depositRateTypes: [...new Set(depositRateTypesMapper(doc))],
         featureTypeDistribution: distributionAggregator(doc, [], featureTypesMapper),
         feeTypeDistribution: distributionAggregator(doc, [], feeTypesMapper),
+        eligibilityTypeDistribution: distributionAggregator(doc, [], eligibilityTypesMapper),
+        constraintTypeDistribution: distributionAggregator(doc, [], constraintTypesMapper),
         lendingRateTypeDistribution: distributionAggregator(doc, [], lendingRateTypesMapper),
         depositRateTypeDistribution: distributionAggregator(doc, [], depositRateTypesMapper),
       }),
